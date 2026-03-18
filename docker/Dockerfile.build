@@ -60,6 +60,8 @@ RUN chmod +x /package/opencode-bin && \
 COPY --from=alpine-libs /tmp/ld-musl-x86_64.so.1 /package/lib/
 COPY --from=alpine-libs /tmp/libstdc++.so.6 /package/lib/
 COPY --from=alpine-libs /tmp/libgcc_s.so.1 /package/lib/
+# libc.musl-x86_64.so.1 is the same file as ld-musl — binary needs both names
+RUN ln -sf ld-musl-x86_64.so.1 /package/lib/libc.musl-x86_64.so.1
 
 # Copy patchelf (Alpine musl-linked, will run via our bundled musl)
 COPY --from=alpine-libs /tmp/patchelf /package/lib/patchelf
