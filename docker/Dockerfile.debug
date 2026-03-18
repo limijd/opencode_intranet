@@ -1,0 +1,88 @@
+# OpenCode Intranet DEBUG Build
+# Adds: strace, debug musl, startup tracing, verbose logging
+#
+# Usage:
+#   docker build -f docker/Dockerfile.debug -t opencode-debug .
+
+# Stage 1: Build on Ubuntu 22.04
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && \
+    apt-get install -y curl unzip git && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+
+WORKDIR /src
+COPY . /src
+
+RUN bun install --ignore-scripts
+
+RUN cd packages/opencode && \
+    OPENCODE_VERSION="0.0.0-intranet-debug" \
+    bun run script/build.ts --musl --skip-install
+
+# Stage 2: Get musl debug libs from Alpine
+FROM alpine:3.20 AS alpine-libs
+
+# Install debug versions + diagnostic tools
+RUN apk add --no-cache libstdc++ libgcc patchelf \
+    musl-dbg strace ltrace
+
+RUN cp /usr/lib/libstdc++.so.6 /tmp/ && \
+    cp /usr/lib/libgcc_s.so.1 /tmp/ && \
+    cp /lib/ld-musl-x86_64.so.1 /tmp/ && \
+    cp /usr/bin/patchelf /tmp/patchelf && \
+    cp /usr/bin/strace /tmp/strace && \
+    (cp /usr/bin/ltrace /tmp/ltrace 2>/dev/null || true)
+
+# Stage 3: Assemble debug package
+FROM ubuntu:22.04 AS assembler
+
+RUN apt-get update && apt-get install -y file patchelf && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /package/lib /package/debug
+
+COPY --from=builder /src/packages/opencode/dist/opencode-linux-x64-musl/bin/opencode /package/opencode-bin
+RUN chmod +x /package/opencode-bin
+
+# musl libs + symlink
+COPY --from=alpine-libs /tmp/ld-musl-x86_64.so.1 /package/lib/
+COPY --from=alpine-libs /tmp/libstdc++.so.6 /package/lib/
+COPY --from=alpine-libs /tmp/libgcc_s.so.1 /package/lib/
+RUN ln -sf ld-musl-x86_64.so.1 /package/lib/libc.musl-x86_64.so.1
+
+# patchelf + diagnostic tools
+COPY --from=alpine-libs /tmp/patchelf /package/lib/patchelf
+COPY --from=alpine-libs /tmp/strace /package/debug/strace
+RUN chmod +x /package/lib/patchelf /package/debug/strace
+
+# Wrapper script
+COPY docker/opencode-wrapper.sh /package/opencode
+RUN chmod +x /package/opencode
+
+# Debug wrapper scripts
+COPY docker/opencode-debug.sh /package/opencode-debug
+COPY docker/opencode-strace.sh /package/opencode-strace
+COPY docker/opencode-trace-startup.sh /package/opencode-trace-startup
+RUN chmod +x /package/opencode-debug /package/opencode-strace /package/opencode-trace-startup
+
+RUN echo "=== Debug package ===" && ls -lhR /package/
+
+# Stage 4: Verify on CentOS 7.6
+FROM centos:7.6.1810
+
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-Base.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Base.repo
+
+RUN useradd -m testuser
+COPY --from=assembler /package/ /home/testuser/opencode/
+RUN chown -R testuser:testuser /home/testuser/opencode/
+
+USER testuser
+WORKDIR /home/testuser
+
+RUN echo "=== Debug build verification ===" && \
+    (./opencode/opencode --version && echo "VERIFY=WORKS") || echo "VERIFY=FAILED"
