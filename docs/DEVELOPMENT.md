@@ -124,31 +124,58 @@ docker run --rm -it opencode-builder bash
 ./opencode/opencode --help
 ```
 
+## Debug Build
+
+For diagnosing startup hangs or other issues on the intranet machine:
+
+```bash
+# Build debug version (includes strace + diagnostic scripts)
+docker build -f docker/Dockerfile.debug -t opencode-debug .
+
+# Extract clean artifacts
+docker build -f docker/Dockerfile.debug --target assembler -t opencode-debug-assembler .
+mkdir -p output-debug
+CONTAINER_ID=$(docker create opencode-debug-assembler)
+docker cp "${CONTAINER_ID}:/package/." output-debug/
+docker rm "${CONTAINER_ID}"
+
+# Package for transfer
+tar -czf opencode-debug.tar.gz -C output-debug .
+```
+
+See [DEBUG.md](DEBUG.md) for full debugging procedures and analysis techniques.
+
 ## Project Structure
 
 ```
 opencode_intranet/
-├── AGENTS.md                              # Agent conventions (upstream)
+├── AGENTS.md                              # Agent conventions (upstream + intranet learnings)
 ├── docker/                                # ★ Intranet build infrastructure
 │   ├── Dockerfile.build                   #   Production multi-stage build
-│   ├── Dockerfile.compat-test             #   glibc compatibility test
-│   ├── Dockerfile.musl-test               #   musl approach validation
-│   ├── build.sh                           #   One-command build script
+│   ├── Dockerfile.debug                   #   Debug build (strace + diagnostics)
+│   ├── Dockerfile.compat-test             #   glibc compatibility test (historical)
+│   ├── Dockerfile.musl-test               #   musl approach validation (historical)
+│   ├── build.sh                           #   One-command production build
 │   ├── build-musl.ts                      #   Standalone musl build (backup)
-│   └── opencode-wrapper.sh               #   Runtime wrapper for CentOS 7.6
+│   ├── opencode-wrapper.sh               #   Runtime wrapper for CentOS 7.6
+│   ├── opencode-debug.sh                 #   Verbose logging wrapper
+│   ├── opencode-strace.sh               #   Syscall tracing wrapper
+│   └── opencode-trace-startup.sh         #   Phased startup analysis
 ├── docs/                                  # ★ Intranet documentation
-│   ├── ARCHITECTURE.md                    #   System architecture
+│   ├── ARCHITECTURE.md                    #   System architecture diagram
 │   ├── BUILD.md                           #   Build instructions
-│   ├── DEPLOY.md                          #   Deployment guide
+│   ├── DEBUG.md                           #   Debugging guide (startup hang analysis)
+│   ├── DEPLOY.md                          #   Deployment + LLM configuration guide
 │   ├── DEVELOPMENT.md                     #   This file
 │   └── plans/
-│       └── 2026-03-18-opencode-intranet-design.md  # Design decisions
-├── output/                                # ★ Build artifacts (gitignored)
+│       └── 2026-03-18-opencode-intranet-design.md  # Original design decisions
+├── output/                                # ★ Production build artifacts (gitignored)
+├── output-debug/                          # ★ Debug build artifacts (gitignored)
 ├── packages/opencode/
 │   ├── script/build.ts                    #   Modified: --musl flag
 │   └── src/
 │       ├── intranet/                      # ★ Intranet config module
-│       │   └── config.ts                  #   OPENCODE_INTRANET env var
+│       │   └── config.ts                  #   OPENCODE_INTRANET + INTRANET_DEBUG
 │       ├── flag/flag.ts                   #   Modified: intranetTruthy()
 │       ├── provider/provider.ts           #   Modified: BUNDLED_PROVIDERS filter
 │       ├── provider/models.ts             #   Modified: skip remote fetch
