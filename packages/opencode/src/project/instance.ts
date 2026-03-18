@@ -6,6 +6,7 @@ import { Log } from "@/util/log"
 import { Context } from "../util/context"
 import { Project } from "./project"
 import { State } from "./state"
+import { dbg } from "@/intranet/config"
 
 interface Context {
   directory: string
@@ -33,6 +34,7 @@ function emit(directory: string) {
 
 function boot(input: { directory: string; init?: () => Promise<any>; project?: Project.Info; worktree?: string }) {
   return iife(async () => {
+    dbg("instance.boot: start " + input.directory)
     const ctx =
       input.project && input.worktree
         ? {
@@ -45,8 +47,11 @@ function boot(input: { directory: string; init?: () => Promise<any>; project?: P
             worktree: sandbox,
             project,
           }))
+    dbg("instance.boot: project resolved")
     await context.provide(ctx, async () => {
+      dbg("instance.boot: init start")
       await input.init?.()
+      dbg("instance.boot: init done")
     })
     return ctx
   })

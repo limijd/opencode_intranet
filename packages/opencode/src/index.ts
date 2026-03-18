@@ -34,6 +34,9 @@ import path from "path"
 import { Global } from "./global"
 import { JsonMigration } from "./storage/json-migration"
 import { Database } from "./storage/db"
+import { dbg } from "./intranet/config"
+
+dbg("index: imports done")
 
 process.on("unhandledRejection", (e) => {
   Log.Default.error("rejection", {
@@ -65,6 +68,7 @@ let cli = yargs(hideBin(process.argv))
     choices: ["DEBUG", "INFO", "WARN", "ERROR"],
   })
   .middleware(async (opts) => {
+    dbg("index: middleware start (Log.init)")
     await Log.init({
       print: process.argv.includes("--print-logs"),
       dev: Installation.isLocal(),
@@ -84,8 +88,10 @@ let cli = yargs(hideBin(process.argv))
       args: process.argv.slice(2),
     })
 
+    dbg("index: Log.init done, checking DB migration")
     const marker = path.join(Global.Path.data, "opencode.db")
     if (!(await Filesystem.exists(marker))) {
+      dbg("index: DB migration starting (first run)")
       const tty = process.stderr.isTTY
       process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
       const width = 36
@@ -119,7 +125,9 @@ let cli = yargs(hideBin(process.argv))
         }
       }
       process.stderr.write("Database migration complete." + EOL)
+      dbg("index: DB migration done")
     }
+    dbg("index: middleware done")
   })
   .usage("\n" + UI.logo())
   .completion("completion", "generate shell completion script")

@@ -46,7 +46,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
-import { INTRANET } from "../intranet/config"
+import { INTRANET, dbg } from "../intranet/config"
 
 const DEFAULT_CHUNK_TIMEOUT = 300_000
 
@@ -831,8 +831,11 @@ export namespace Provider {
 
   const state = Instance.state(async () => {
     using _ = log.time("state")
+    dbg("provider.state: Config.get start")
     const config = await Config.get()
+    dbg("provider.state: Config.get done, ModelsDev.get start")
     const modelsDev = await ModelsDev.get()
+    dbg("provider.state: ModelsDev.get done")
     const database = mapValues(modelsDev, fromModelsDevProvider)
 
     const disabled = new Set(config.disabled_providers ?? [])

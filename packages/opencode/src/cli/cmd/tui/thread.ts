@@ -14,6 +14,7 @@ import type { EventSource } from "./context/sdk"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
 import { TuiConfig } from "@/config/tui"
 import { Instance } from "@/project/instance"
+import { dbg } from "@/intranet/config"
 
 declare global {
   const OPENCODE_WORKER_PATH: string
@@ -128,6 +129,7 @@ export const TuiThreadCommand = cmd({
       }
       const cwd = Filesystem.resolve(process.cwd())
 
+      dbg("thread: creating worker")
       const worker = new Worker(file, {
         env: Object.fromEntries(
           Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined),
@@ -167,11 +169,14 @@ export const TuiThreadCommand = cmd({
         worker.terminate()
       }
 
+      dbg("thread: worker created, getting prompt input")
       const prompt = await input(args.prompt)
+      dbg("thread: Instance.provide (TuiConfig) start")
       const config = await Instance.provide({
         directory: cwd,
         fn: () => TuiConfig.get(),
       })
+      dbg("thread: Instance.provide (TuiConfig) done")
 
       const network = await resolveNetworkOptions(args)
       const external =
@@ -198,6 +203,7 @@ export const TuiThreadCommand = cmd({
         client.call("checkUpgrade", { directory: cwd }).catch(() => {})
       }, 1000).unref?.()
 
+      dbg("thread: launching TUI")
       try {
         await tui({
           url: transport.url,

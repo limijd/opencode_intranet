@@ -4,13 +4,15 @@
 
 export const INTRANET = process.env.OPENCODE_INTRANET === "1"
 
-// Debug mode: log startup timing to help diagnose hangs
-export const INTRANET_DEBUG = INTRANET && process.env.OPENCODE_INTRANET_DEBUG === "1"
+// Debug mode: OPENCODE_INTRANET_DEBUG=1 logs timestamps at every startup phase
+export const INTRANET_DEBUG = process.env.OPENCODE_INTRANET_DEBUG === "1"
 
-if (INTRANET_DEBUG) {
-  const start = performance.now()
-  process.on("beforeExit", () => {
-    console.error(`[intranet-debug] total runtime: ${(performance.now() - start).toFixed(0)}ms`)
-  })
-  console.error(`[intranet-debug] config loaded at ${new Date().toISOString()}`)
+const t0 = performance.now()
+
+export function dbg(label: string) {
+  if (!INTRANET_DEBUG) return
+  const ms = (performance.now() - t0).toFixed(0)
+  console.error(`[dbg +${ms}ms] ${label}`)
 }
+
+dbg("intranet/config loaded")

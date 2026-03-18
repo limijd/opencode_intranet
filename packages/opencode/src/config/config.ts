@@ -29,7 +29,7 @@ import { constants, existsSync } from "fs"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
-import { INTRANET } from "../intranet/config"
+import { INTRANET, dbg } from "../intranet/config"
 import { Glob } from "../util/glob"
 import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
@@ -77,7 +77,9 @@ export namespace Config {
   }
 
   export const state = Instance.state(async () => {
+    dbg("config.state: start")
     const auth = await Auth.all()
+    dbg("config.state: auth loaded")
 
     // Config loading order (low -> high precedence): https://opencode.ai/docs/config#precedence-order
     // 1) Remote .well-known/opencode (org defaults)

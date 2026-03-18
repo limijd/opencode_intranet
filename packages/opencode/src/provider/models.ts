@@ -6,7 +6,7 @@ import { Installation } from "../installation"
 import { Flag } from "../flag/flag"
 import { lazy } from "@/util/lazy"
 import { Filesystem } from "../util/filesystem"
-import { INTRANET } from "../intranet/config"
+import { INTRANET, dbg } from "../intranet/config"
 
 // Try to import bundled snapshot (generated at build time)
 // Falls back to undefined in dev mode when snapshot doesn't exist
@@ -87,15 +87,18 @@ export namespace ModelsDev {
   }
 
   export const Data = lazy(async () => {
+    dbg("models.Data: start")
     const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => {})
-    if (result) return result
+    if (result) { dbg("models.Data: loaded from file"); return result }
     // @ts-ignore
     const snapshot = await import("./models-snapshot")
       .then((m) => m.snapshot as Record<string, unknown>)
       .catch(() => undefined)
-    if (snapshot) return snapshot
-    if (INTRANET || Flag.OPENCODE_DISABLE_MODELS_FETCH) return {}
+    if (snapshot) { dbg("models.Data: loaded from snapshot"); return snapshot }
+    if (INTRANET || Flag.OPENCODE_DISABLE_MODELS_FETCH) { dbg("models.Data: intranet/disabled, returning empty"); return {} }
+    dbg("models.Data: fetching from network (THIS SHOULD NOT HAPPEN IN INTRANET)")
     const json = await fetch(`${url()}/api.json`).then((x) => x.text())
+    dbg("models.Data: network fetch done")
     return JSON.parse(json)
   })
 

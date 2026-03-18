@@ -11,6 +11,9 @@ import { createOpencodeClient, type Event } from "@opencode-ai/sdk/v2"
 import type { BunWebSocketData } from "hono/bun"
 import { Flag } from "@/flag/flag"
 import { setTimeout as sleep } from "node:timers/promises"
+import { dbg } from "@/intranet/config"
+
+dbg("worker: module start")
 
 await Log.init({
   print: process.argv.includes("--print-logs"),
@@ -96,7 +99,9 @@ const startEventStream = (input: { directory: string; workspaceID?: string }) =>
   })
 }
 
+dbg("worker: Log.init done, starting event stream")
 startEventStream({ directory: process.cwd() })
+dbg("worker: event stream started")
 
 export const rpc = {
   async fetch(input: { url: string; method: string; headers: Record<string, string>; body?: string }) {
