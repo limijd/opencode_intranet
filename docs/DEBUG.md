@@ -60,47 +60,81 @@ output-debug/
 
 ### Step-by-Step Debugging on Intranet Machine
 
+**Best first step: built-in startup instrumentation (no strace needed)**
+
 ```bash
-# 1. Extract and setup
-mkdir -p ~/opencode-debug && cd ~/opencode-debug
-tar -xzf opencode-debug.tar.gz
+# 1. Run with debug timestamps — this is the PRIMARY debug tool
+OPENCODE_INTRANET_DEBUG=1 ./opencode 2>/tmp/dbg.log &
 
-# 2. First: verify basic execution works
-./opencode --version
-# Should print version. If this hangs, the issue is in very early init.
+# 2. Watch the timestamps in real-time
+tail -f /tmp/dbg.log
 
-# 3. Run the startup trace (best first step)
-./opencode-trace-startup 2>&1 | tee /tmp/startup-trace.log
-# This tests:
-#   - DNS resolution timing
-#   - Filesystem checks
-#   - Individual command timing (--version, providers, providers list)
-#   - 5-second strace snapshot
-# Look for: which phase takes the longest
+# Output looks like:
+# [dbg +0ms] intranet/config loaded
+# [dbg +285ms] index: imports done
+# [dbg +293ms] index: middleware start (Log.init)
+# [dbg +301ms] index: Log.init done, checking DB migration
+# [dbg +308ms] index: middleware done
+# [dbg +313ms] thread: creating worker
+# [dbg +400ms] thread: worker created, getting prompt input
+# [dbg +410ms] thread: Instance.provide (TuiConfig) start
+# [dbg +500ms] instance.boot: start /path/to/project
+# [dbg +510ms] instance.boot: project resolved
+# [dbg +520ms] instance.boot: init start
+# [dbg +530ms] bootstrap: start
+# [dbg +540ms] bootstrap: Plugin.init start
+# ...
+# THE HANG IS BETWEEN THE LAST LINE AND THE NEXT EXPECTED LINE
 
-# 4. If startup trace shows network issues, run full strace
-./opencode-strace 2>&1
-# Ctrl+C after you see it hanging
-# Log at: /tmp/opencode-strace-*.log
-#
-# Analyze the log:
-grep "connect(" /tmp/opencode-strace-*.log | grep -v ENOENT
-# Look for: IP addresses being connected to (these reveal which service)
-# Common findings:
-#   connect(AF_INET, {sin_addr="142.x.x.x"})  → external service
-#   connect(AF_INET, {sin_addr="10.x.x.x"})   → internal (probably OK)
+# 3. Kill it after seeing where it hangs
+kill %1
+```
 
-# 5. For verbose application logging
-OPENCODE_INTRANET_DEBUG=1 ./opencode-debug 2>/tmp/debug.log &
-# Wait a bit, then:
-tail -f /tmp/debug.log
-# Look for: which log line appears last before the hang
+**All instrumented phases:**
 
-# 6. Quick DNS test (rule out DNS)
+| Timestamp label | What it means |
+|-----------------|---------------|
+| `intranet/config loaded` | Module system started |
+| `index: imports done` | All top-level imports resolved |
+| `index: middleware start` | yargs middleware (Log.init, DB check) |
+| `index: DB migration starting` | First-run SQLite migration |
+| `index: middleware done` | Ready to dispatch command |
+| `thread: creating worker` | Bun Worker thread being spawned |
+| `thread: Instance.provide start` | Project instance initialization |
+| `instance.boot: start` | Project directory resolution |
+| `instance.boot: project resolved` | Git/project detection done |
+| `instance.boot: init start` | InstanceBootstrap beginning |
+| `bootstrap: Plugin.init start/done` | Plugin loading |
+| `bootstrap: ShareNext.init done` | Share initialization (disabled in intranet) |
+| `bootstrap: Format.init done` | Code formatter init |
+| `bootstrap: LSP.init done` | Language server init |
+| `bootstrap: FileWatcher done` | File watcher init |
+| `bootstrap: Vcs.init done` | Git/VCS init |
+| `config.state: start` | Config loading |
+| `config.state: auth loaded` | Auth entries read |
+| `provider.state: Config.get start/done` | Provider config |
+| `provider.state: ModelsDev.get start/done` | Model catalog loading |
+| `models.Data: loaded from snapshot` | Model data source |
+| `thread: launching TUI` | TUI render starting |
+| `worker: event stream started` | SSE event loop running |
+
+**If the gap is between two specific labels**, that tells you exactly which function is hanging.
+
+**Other diagnostic tools:**
+
+```bash
+# Quick DNS test (rule out DNS — but multi-hour hang is NOT DNS)
 time getent hosts $(hostname)
 time getent hosts localhost
-time getent hosts models.dev       # should fail fast (NXDOMAIN) or hang (bad DNS)
-# If any takes >2 seconds, DNS is part of the problem
+
+# strace NOTE: system strace may not work with patchelf'd musl binary.
+# If strace fails with "libdw.so" or symbol errors, use the built-in
+# debug timestamps above instead — they are MORE useful than strace
+# for this problem anyway.
+
+# Verbose app logging (all internal logs to stderr)
+./opencode --print-logs --log-level DEBUG 2>/tmp/verbose.log &
+tail -f /tmp/verbose.log
 ```
 
 ### Interpreting strace Output
