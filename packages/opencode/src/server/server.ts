@@ -33,6 +33,7 @@ import { McpRoutes } from "./routes/mcp"
 import { FileRoutes } from "./routes/file"
 import { ConfigRoutes } from "./routes/config"
 import { ExperimentalRoutes } from "./routes/experimental"
+import { INTRANET } from "../intranet/config"
 import { ProviderRoutes } from "./routes/provider"
 import { InstanceBootstrap } from "../project/bootstrap"
 import { NotFoundError } from "../storage/db"
@@ -556,6 +557,7 @@ export namespace Server {
         },
       )
       .all("/*", async (c) => {
+        if (INTRANET) return c.text("Disabled in intranet mode", 503)
         const path = c.req.path
 
         const response = await proxy(`https://app.opencode.ai${path}`, {

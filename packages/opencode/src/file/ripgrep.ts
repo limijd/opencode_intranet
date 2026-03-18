@@ -13,6 +13,7 @@ import { text } from "node:stream/consumers"
 
 import { ZipReader, BlobReader, BlobWriter } from "@zip.js/zip.js"
 import { Log } from "@/util/log"
+import { INTRANET } from "../intranet/config"
 
 export namespace Ripgrep {
   const log = Log.create({ service: "ripgrep" })
@@ -137,6 +138,8 @@ export namespace Ripgrep {
     const filepath = path.join(Global.Path.bin, "rg" + (process.platform === "win32" ? ".exe" : ""))
 
     if (!(await Filesystem.exists(filepath))) {
+      if (INTRANET) throw new UnsupportedPlatformError({ platform: "intranet-no-download" })
+
       const platformKey = `${process.arch}-${process.platform}` as keyof typeof PLATFORM
       const config = PLATFORM[platformKey]
       if (!config) throw new UnsupportedPlatformError({ platform: platformKey })

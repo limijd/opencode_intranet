@@ -1,8 +1,14 @@
 import { Config } from "effect"
+import { INTRANET } from "../intranet/config"
 
 function truthy(key: string) {
   const value = process.env[key]?.toLowerCase()
   return value === "true" || value === "1"
+}
+
+// In intranet mode, force-disable all external network features
+function intranetTruthy(key: string) {
+  return INTRANET || truthy(key)
 }
 
 function falsy(key: string) {
@@ -17,15 +23,15 @@ export namespace Flag {
   export declare const OPENCODE_TUI_CONFIG: string | undefined
   export declare const OPENCODE_CONFIG_DIR: string | undefined
   export const OPENCODE_CONFIG_CONTENT = process.env["OPENCODE_CONFIG_CONTENT"]
-  export const OPENCODE_DISABLE_AUTOUPDATE = truthy("OPENCODE_DISABLE_AUTOUPDATE")
+  export const OPENCODE_DISABLE_AUTOUPDATE = intranetTruthy("OPENCODE_DISABLE_AUTOUPDATE")
   export const OPENCODE_DISABLE_PRUNE = truthy("OPENCODE_DISABLE_PRUNE")
   export const OPENCODE_DISABLE_TERMINAL_TITLE = truthy("OPENCODE_DISABLE_TERMINAL_TITLE")
   export const OPENCODE_PERMISSION = process.env["OPENCODE_PERMISSION"]
   export const OPENCODE_DISABLE_DEFAULT_PLUGINS = truthy("OPENCODE_DISABLE_DEFAULT_PLUGINS")
-  export const OPENCODE_DISABLE_LSP_DOWNLOAD = truthy("OPENCODE_DISABLE_LSP_DOWNLOAD")
+  export const OPENCODE_DISABLE_LSP_DOWNLOAD = intranetTruthy("OPENCODE_DISABLE_LSP_DOWNLOAD")
   export const OPENCODE_ENABLE_EXPERIMENTAL_MODELS = truthy("OPENCODE_ENABLE_EXPERIMENTAL_MODELS")
   export const OPENCODE_DISABLE_AUTOCOMPACT = truthy("OPENCODE_DISABLE_AUTOCOMPACT")
-  export const OPENCODE_DISABLE_MODELS_FETCH = truthy("OPENCODE_DISABLE_MODELS_FETCH")
+  export const OPENCODE_DISABLE_MODELS_FETCH = intranetTruthy("OPENCODE_DISABLE_MODELS_FETCH")
   export const OPENCODE_DISABLE_CLAUDE_CODE = truthy("OPENCODE_DISABLE_CLAUDE_CODE")
   export const OPENCODE_DISABLE_CLAUDE_CODE_PROMPT =
     OPENCODE_DISABLE_CLAUDE_CODE || truthy("OPENCODE_DISABLE_CLAUDE_CODE_PROMPT")

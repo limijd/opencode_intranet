@@ -1,0 +1,73 @@
+# Test: musl binary + bundled musl libc + libstdc++ + libgcc_s on CentOS 7.6
+
+# Stage 1: Build on Ubuntu, collect all needed libs
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && apt-get install -y curl unzip file binutils musl-tools && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+
+RUN mkdir -p /test && echo 'console.log("Hello from OpenCode Intranet! " + process.version)' > /test/hello.ts
+
+# Compile musl target
+RUN cd /test && bun build --compile --target=bun-linux-x64-musl hello.ts --outfile hello-musl
+
+# Collect all dynamic deps from the musl binary
+RUN mkdir -p /test/lib && \
+    echo "=== ldd output ===" && \
+    /lib/ld-musl-x86_64.so.1 --list /test/hello-musl 2>&1 || true
+
+# Copy musl linker
+RUN cp /lib/ld-musl-x86_64.so.1 /test/lib/
+
+# Copy libstdc++ and libgcc_s (from system - these are glibc-linked but let's try musl-compatible ones)
+# Actually, let's get musl-compatible versions by installing them via Alpine in a separate stage
+
+# Stage 1b: Get musl-native libstdc++ and libgcc from Alpine
+FROM alpine:3.20 AS alpine-libs
+
+RUN apk add --no-cache libstdc++ libgcc
+RUN echo "=== Alpine libs ===" && \
+    ls -la /usr/lib/libstdc++* /usr/lib/libgcc_s* /lib/ld-musl* 2>&1
+RUN cp /usr/lib/libstdc++.so.6 /tmp/ && \
+    cp /usr/lib/libgcc_s.so.1 /tmp/ && \
+    cp /lib/ld-musl-x86_64.so.1 /tmp/
+
+# Stage 2: Assemble and test on CentOS 7.6
+FROM centos:7.6.1810
+
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-Base.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Base.repo
+
+# Copy binary
+COPY --from=builder /test/hello-musl /opt/opencode/hello-musl
+
+# Copy musl-native libs from Alpine
+COPY --from=alpine-libs /tmp/ld-musl-x86_64.so.1 /opt/opencode/lib/
+COPY --from=alpine-libs /tmp/libstdc++.so.6 /opt/opencode/lib/
+COPY --from=alpine-libs /tmp/libgcc_s.so.1 /opt/opencode/lib/
+
+# Create wrapper
+RUN echo '#!/bin/bash' > /opt/opencode/opencode && \
+    echo 'DIR="$(cd "$(dirname "$0")" && pwd)"' >> /opt/opencode/opencode && \
+    echo 'exec "$DIR/lib/ld-musl-x86_64.so.1" --library-path "$DIR/lib" "$DIR/hello-musl" "$@"' >> /opt/opencode/opencode && \
+    chmod +x /opt/opencode/opencode /opt/opencode/hello-musl
+
+RUN echo "=== CentOS glibc ===" && ldd --version 2>&1 | head -1
+
+RUN echo "=== Test 1: Direct via musl linker ===" && \
+    (/opt/opencode/lib/ld-musl-x86_64.so.1 --library-path /opt/opencode/lib /opt/opencode/hello-musl && \
+     echo "DIRECT=WORKS") || echo "DIRECT=FAILED"
+
+RUN echo "=== Test 2: Wrapper script ===" && \
+    (/opt/opencode/opencode && echo "WRAPPER=WORKS") || echo "WRAPPER=FAILED"
+
+RUN echo "=== Test 3: Symlink approach ===" && \
+    ln -sf /opt/opencode/lib/ld-musl-x86_64.so.1 /lib/ld-musl-x86_64.so.1 && \
+    ln -sf /opt/opencode/lib/libstdc++.so.6 /usr/lib64/libstdc++.so.6.musl && \
+    ln -sf /opt/opencode/lib/libgcc_s.so.1 /usr/lib64/libgcc_s.so.1.musl && \
+    (LD_LIBRARY_PATH=/opt/opencode/lib /opt/opencode/hello-musl && echo "SYMLINK=WORKS") || echo "SYMLINK=FAILED"
+
+RUN echo "=== Package size ===" && du -sh /opt/opencode/

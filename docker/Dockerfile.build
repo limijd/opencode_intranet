@@ -1,0 +1,98 @@
+# OpenCode Intranet Builder
+# Produces a musl-linked binary that runs on CentOS 7.6 (glibc 2.17)
+# Fully user-level — no root required on target machine.
+#
+# Usage:
+#   docker build -f docker/Dockerfile.build -t opencode-builder .
+
+# Stage 1: Build on Ubuntu 22.04 (Bun runs natively here)
+FROM ubuntu:22.04 AS builder
+
+RUN apt-get update && \
+    apt-get install -y curl unzip git && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash
+ENV BUN_INSTALL="/root/.bun"
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+
+# Copy source
+WORKDIR /src
+COPY . /src
+
+# Install dependencies (ignore postinstall failures from electron etc.)
+RUN bun install --ignore-scripts
+
+# Build musl target using official build script with --musl flag
+RUN cd packages/opencode && \
+    OPENCODE_VERSION="0.0.0-intranet" \
+    bun run script/build.ts --musl --skip-install
+
+RUN echo "=== Build artifacts ===" && \
+    find /src/packages/opencode/dist -name "opencode" -type f 2>/dev/null && \
+    ls -lh /src/packages/opencode/dist/*/bin/ 2>/dev/null || \
+    echo "No artifacts found"
+
+# Stage 2: Get musl-native libs + build static patchelf from Alpine
+FROM alpine:3.20 AS alpine-libs
+
+RUN apk add --no-cache libstdc++ libgcc patchelf
+RUN cp /usr/lib/libstdc++.so.6 /tmp/ && \
+    cp /usr/lib/libgcc_s.so.1 /tmp/ && \
+    cp /lib/ld-musl-x86_64.so.1 /tmp/ && \
+    cp /usr/bin/patchelf /tmp/patchelf
+
+# Stage 3: Assemble package
+FROM ubuntu:22.04 AS assembler
+
+RUN apt-get update && apt-get install -y file patchelf && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /package/lib
+
+# Copy musl binary
+COPY --from=builder /src/packages/opencode/dist/opencode-linux-x64-musl/bin/opencode /package/opencode-bin
+RUN chmod +x /package/opencode-bin && \
+    echo "=== Binary info ===" && \
+    file /package/opencode-bin
+
+# Copy musl libs
+COPY --from=alpine-libs /tmp/ld-musl-x86_64.so.1 /package/lib/
+COPY --from=alpine-libs /tmp/libstdc++.so.6 /package/lib/
+COPY --from=alpine-libs /tmp/libgcc_s.so.1 /package/lib/
+
+# Copy patchelf (Alpine musl-linked, will run via our bundled musl)
+COPY --from=alpine-libs /tmp/patchelf /package/lib/patchelf
+RUN chmod +x /package/lib/patchelf
+
+# Create wrapper script:
+# On first run, uses patchelf to rewrite the ELF interpreter path to our bundled musl.
+# After patching, the binary runs directly — no root, no /lib symlink needed.
+COPY docker/opencode-wrapper.sh /package/opencode
+RUN chmod +x /package/opencode
+
+RUN echo "=== Final package ===" && \
+    ls -lh /package/ /package/lib/ && \
+    du -sh /package/
+
+# Stage 4: Verify on CentOS 7.6 as non-root user
+FROM centos:7.6.1810
+
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-Base.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Base.repo
+
+# Create non-root user to verify no root needed
+RUN useradd -m testuser
+COPY --from=assembler /package/ /home/testuser/opencode/
+RUN chown -R testuser:testuser /home/testuser/opencode/
+
+USER testuser
+WORKDIR /home/testuser
+
+RUN echo "=== Verification (non-root): opencode --version ===" && \
+    (./opencode/opencode --version && echo "VERIFY=WORKS") || \
+    echo "VERIFY=FAILED"
+
+RUN echo "=== Verification (non-root): opencode providers ===" && \
+    (./opencode/opencode providers 2>&1 | head -5 && echo "PROVIDERS=WORKS") || \
+    echo "PROVIDERS=FAILED"

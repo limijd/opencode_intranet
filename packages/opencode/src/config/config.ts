@@ -29,6 +29,7 @@ import { constants, existsSync } from "fs"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
 import { Event } from "../server/event"
+import { INTRANET } from "../intranet/config"
 import { Glob } from "../util/glob"
 import { PackageRegistry } from "@/bun/registry"
 import { proxied } from "@/util/proxied"
@@ -88,6 +89,7 @@ export namespace Config {
     // Managed config directory is enterprise-only and always overrides everything above.
     let result: Info = {}
     for (const [key, value] of Object.entries(auth)) {
+      if (INTRANET) break
       if (value.type === "wellknown") {
         const url = key.replace(/\/+$/, "")
         process.env[value.key] = value.token

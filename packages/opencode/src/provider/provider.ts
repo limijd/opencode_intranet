@@ -46,6 +46,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
+import { INTRANET } from "../intranet/config"
 
 const DEFAULT_CHUNK_TIMEOUT = 300_000
 
@@ -106,30 +107,34 @@ export namespace Provider {
     })
   }
 
-  const BUNDLED_PROVIDERS: Record<string, (options: any) => SDK> = {
-    "@ai-sdk/amazon-bedrock": createAmazonBedrock,
-    "@ai-sdk/anthropic": createAnthropic,
-    "@ai-sdk/azure": createAzure,
-    "@ai-sdk/google": createGoogleGenerativeAI,
-    "@ai-sdk/google-vertex": createVertex,
-    "@ai-sdk/google-vertex/anthropic": createVertexAnthropic,
-    "@ai-sdk/openai": createOpenAI,
-    "@ai-sdk/openai-compatible": createOpenAICompatible,
-    "@openrouter/ai-sdk-provider": createOpenRouter,
-    "@ai-sdk/xai": createXai,
-    "@ai-sdk/mistral": createMistral,
-    "@ai-sdk/groq": createGroq,
-    "@ai-sdk/deepinfra": createDeepInfra,
-    "@ai-sdk/cerebras": createCerebras,
-    "@ai-sdk/cohere": createCohere,
-    "@ai-sdk/gateway": createGateway,
-    "@ai-sdk/togetherai": createTogetherAI,
-    "@ai-sdk/perplexity": createPerplexity,
-    "@ai-sdk/vercel": createVercel,
-    "@gitlab/gitlab-ai-provider": createGitLab,
-    // @ts-ignore (TODO: kill this code so we dont have to maintain it)
-    "@ai-sdk/github-copilot": createGitHubCopilotOpenAICompatible,
-  }
+  const BUNDLED_PROVIDERS: Record<string, (options: any) => SDK> = INTRANET
+    ? {
+        "@ai-sdk/openai-compatible": createOpenAICompatible,
+      }
+    : {
+        "@ai-sdk/amazon-bedrock": createAmazonBedrock,
+        "@ai-sdk/anthropic": createAnthropic,
+        "@ai-sdk/azure": createAzure,
+        "@ai-sdk/google": createGoogleGenerativeAI,
+        "@ai-sdk/google-vertex": createVertex,
+        "@ai-sdk/google-vertex/anthropic": createVertexAnthropic,
+        "@ai-sdk/openai": createOpenAI,
+        "@ai-sdk/openai-compatible": createOpenAICompatible,
+        "@openrouter/ai-sdk-provider": createOpenRouter,
+        "@ai-sdk/xai": createXai,
+        "@ai-sdk/mistral": createMistral,
+        "@ai-sdk/groq": createGroq,
+        "@ai-sdk/deepinfra": createDeepInfra,
+        "@ai-sdk/cerebras": createCerebras,
+        "@ai-sdk/cohere": createCohere,
+        "@ai-sdk/gateway": createGateway,
+        "@ai-sdk/togetherai": createTogetherAI,
+        "@ai-sdk/perplexity": createPerplexity,
+        "@ai-sdk/vercel": createVercel,
+        "@gitlab/gitlab-ai-provider": createGitLab,
+        // @ts-ignore (TODO: kill this code so we dont have to maintain it)
+        "@ai-sdk/github-copilot": createGitHubCopilotOpenAICompatible,
+      }
 
   type CustomModelLoader = (sdk: any, modelID: string, options?: Record<string, any>) => Promise<any>
   type CustomVarsLoader = (options: Record<string, any>) => Record<string, string>

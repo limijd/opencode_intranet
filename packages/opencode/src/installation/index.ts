@@ -7,6 +7,7 @@ import { iife } from "@/util/iife"
 import { Flag } from "../flag/flag"
 import { Process } from "@/util/process"
 import { buffer } from "node:stream/consumers"
+import { INTRANET } from "../intranet/config"
 
 declare global {
   const OPENCODE_VERSION: string
@@ -236,6 +237,7 @@ export namespace Installation {
   export const USER_AGENT = `opencode/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
 
   export async function latest(installMethod?: Method) {
+    if (INTRANET) return VERSION
     const detectedMethod = installMethod || (await method())
 
     if (detectedMethod === "brew") {

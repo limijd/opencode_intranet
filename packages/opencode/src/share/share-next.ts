@@ -10,6 +10,7 @@ import { Database, eq } from "@/storage/db"
 import { SessionShareTable } from "./share.sql"
 import { Log } from "@/util/log"
 import type * as SDK from "@opencode-ai/sdk/v2"
+import { INTRANET } from "@/intranet/config"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
@@ -61,7 +62,7 @@ export namespace ShareNext {
     return { headers, api: consoleApi, baseUrl: active.url }
   }
 
-  const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+  const disabled = INTRANET || process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
 
   export async function init() {
     if (disabled) return

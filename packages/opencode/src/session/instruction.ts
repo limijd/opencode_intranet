@@ -8,6 +8,7 @@ import { Flag } from "@/flag/flag"
 import { Log } from "../util/log"
 import { Glob } from "../util/glob"
 import type { MessageV2 } from "./message-v2"
+import { INTRANET } from "../intranet/config"
 
 const log = Log.create({ service: "instruction" })
 
@@ -124,7 +125,7 @@ export namespace InstructionPrompt {
     })
 
     const urls: string[] = []
-    if (config.instructions) {
+    if (!INTRANET && config.instructions) {
       for (const instruction of config.instructions) {
         if (instruction.startsWith("https://") || instruction.startsWith("http://")) {
           urls.push(instruction)

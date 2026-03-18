@@ -1,0 +1,30 @@
+# Compatibility test: Can Bun run on CentOS 7.6 (glibc 2.17)?
+FROM centos:7.6.1810
+
+# CentOS 7 mirrors are EOL, switch to vault
+RUN sed -i 's|^mirrorlist=|#mirrorlist=|g' /etc/yum.repos.d/CentOS-Base.repo && \
+    sed -i 's|^#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-Base.repo
+
+# Install prerequisites
+RUN yum install -y unzip curl && yum clean all
+
+# Check glibc version
+RUN echo "=== GLIBC VERSION ===" && ldd --version 2>&1 | head -1
+
+# Install Bun
+RUN curl -fsSL https://bun.sh/install | bash || echo "INSTALL_FAILED"
+
+# Test: Can Bun run?
+RUN echo "=== BUN VERSION ===" && \
+    (export BUN_INSTALL="$HOME/.bun" && export PATH="$BUN_INSTALL/bin:$PATH" && \
+     bun --version && echo "BUN_WORKS=YES") || echo "BUN_WORKS=NO"
+
+# Check glibc requirements of Bun binary
+RUN echo "=== BUN LDD ===" && \
+    (export BUN_INSTALL="$HOME/.bun" && \
+     ldd "$BUN_INSTALL/bin/bun" 2>&1) || echo "LDD_CHECK_FAILED"
+
+# Check minimum glibc needed
+RUN echo "=== BUN GLIBC SYMBOLS ===" && \
+    (export BUN_INSTALL="$HOME/.bun" && \
+     objdump -T "$BUN_INSTALL/bin/bun" 2>/dev/null | grep GLIBC | sed 's/.*GLIBC_/GLIBC_/' | sort -u) || echo "OBJDUMP_FAILED"
