@@ -41,6 +41,7 @@ import { writeHeapSnapshot } from "v8"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiConfig } from "@/config/tui"
+import { dbg } from "@/intranet/config"
 
 async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
   // can't set raw mode if not a TTY
@@ -115,10 +116,13 @@ export function tui(input: {
 }) {
   // promise to prevent immediate exit
   return new Promise<void>(async (resolve) => {
+    dbg("tui(): start")
     const unguard = win32InstallCtrlCGuard()
     win32DisableProcessedInput()
 
+    dbg("tui(): getTerminalBackgroundColor start")
     const mode = await getTerminalBackgroundColor()
+    dbg("tui(): getTerminalBackgroundColor done=" + mode)
 
     // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
     // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
@@ -129,6 +133,7 @@ export function tui(input: {
       resolve()
     }
 
+    dbg("tui(): render start")
     render(
       () => {
         return (

@@ -115,8 +115,10 @@ export namespace Config {
       }
     }
 
+    dbg("config.state: well-known done, loading global config")
     // Global user config overrides remote config.
     result = mergeConfigConcatArrays(result, await global())
+    dbg("config.state: global config loaded")
 
     // Custom config path overrides global config.
     if (Flag.OPENCODE_CONFIG) {
@@ -159,7 +161,11 @@ export namespace Config {
       deps.push(
         iife(async () => {
           const shouldInstall = await needsInstall(dir)
-          if (shouldInstall) await installDependencies(dir)
+          if (shouldInstall) {
+            dbg("config.state: installDependencies start " + dir)
+            await installDependencies(dir)
+            dbg("config.state: installDependencies done " + dir)
+          }
         }),
       )
 
@@ -169,6 +175,9 @@ export namespace Config {
       result.plugin.push(...(await loadPlugin(dir)))
     }
 
+    dbg("config.state: .opencode dirs loaded, installing deps")
+    await Promise.all(deps)
+    dbg("config.state: deps installed")
     // Inline config content overrides all non-managed config sources.
     if (process.env.OPENCODE_CONFIG_CONTENT) {
       result = mergeConfigConcatArrays(
@@ -181,7 +190,9 @@ export namespace Config {
       log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
     }
 
+    dbg("config.state: checking Account.active")
     const active = Account.active()
+    dbg("config.state: Account.active=" + (active ? "exists" : "none"))
     if (active?.active_org_id) {
       try {
         const [config, token] = await Promise.all([
