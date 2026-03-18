@@ -100,47 +100,16 @@ opencode-intranet/
 
 ### Wrapper Script
 
-```bash
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "$DIR/lib/ld-musl-x86_64.so.1" --library-path "$DIR/lib" "$DIR/opencode-bin" "$@"
-```
+Uses patchelf on first run to rewrite ELF interpreter to `~/.opencode/lib/ld-musl-x86_64.so.1`.
+No root required. See `docker/opencode-wrapper.sh` for full implementation.
 
-## Git Workflow
+## Implementation Status (All Complete)
 
-```bash
-# Initial setup
-git remote add upstream git@github.com:anomalyco/opencode.git
-git remote set-url origin git@github.com:limijd/opencode_intranet.git
-
-# Periodic sync
-git fetch upstream
-git merge upstream/main  # resolve conflicts in intranet/ changes
-```
-
-## Implementation Order
-
-1. **Compatibility verification** (FIRST — blocks everything else)
-   - Docker CentOS 7.6: test if Bun binary runs
-   - Test `bun build --compile` output on CentOS 7.6
-   - Determine Plan A/B/C
-
-2. **Docker build infrastructure**
-   - Dockerfile.builder
-   - Dockerfile.test
-   - build.sh / export.sh
-
-3. **Runtime disable implementation**
-   - `intranet/config.ts`
-   - Guards in each upstream module
-   - Code audit for any other external network calls
-
-4. **Provider configuration**
-   - Default config for openai-compatible provider
-   - Documentation for intranet users
-
-5. **End-to-end validation**
-   - Build in Docker
-   - Run on clean CentOS 7.6
+- [x] Compatibility verification — Plan A (glibc) failed, Plan C (musl) verified
+- [x] Docker build infrastructure — `docker/Dockerfile.build` multi-stage pipeline
+- [x] Runtime disable — 10 modules guarded via `OPENCODE_INTRANET=1`
+- [x] User-level deployment — patchelf approach, no root needed
+- [x] End-to-end validation — non-root user on CentOS 7.6 verified
+- [x] Documentation — see `docs/BUILD.md`, `docs/DEPLOY.md`, `docs/DEVELOPMENT.md`
    - Connect to OpenAI-compatible endpoint
    - Verify no external network requests

@@ -126,3 +126,19 @@ const table = sqliteTable("session", {
 ## Type Checking
 
 - Always run `bun typecheck` from package directories (e.g., `packages/opencode`), never `tsc` directly.
+
+## Intranet Fork Notes
+
+This is a fork of [anomalyco/opencode](https://github.com/anomalyco/opencode) for air-gapped intranet deployment.
+See `docs/` for full documentation.
+
+### Key Learnings
+
+- **Bun on CentOS 7.6**: Bun requires glibc 2.25+, CentOS 7.6 only has 2.17. Must use `--target=bun-linux-x64-musl`.
+- **musl binary is NOT static**: Bun musl builds still dynamically link `ld-musl-x86_64.so.1`, `libstdc++.so.6`, `libgcc_s.so.1`. Must bundle these from Alpine.
+- **Invoking via ld-musl breaks Bun compiled mode**: Running `ld-musl-x86_64.so.1 ./opencode-bin` causes Bun to show its own help instead of the embedded app. The binary must be invoked directly — use `patchelf --set-interpreter` to rewrite the ELF interpreter path.
+- **patchelf can break Bun binaries**: Some patchelf operations cause segfaults. The `--set-interpreter` flag alone is safe; avoid `--set-rpath` combined with interpreter changes on Bun binaries.
+- **`bun install --ignore-scripts`**: The monorepo has `electron` whose postinstall fails in Docker. Safe to skip — only `packages/opencode` is needed.
+- **build.ts models.dev fetch**: The build script fetches from `models.dev/api.json` and embeds it. Don't set `MODELS_DEV_API_JSON` to empty `{}` — it generates invalid TypeScript. Let the build fetch normally (build machine has internet).
+- **`--single` flag skips musl**: The upstream `--single` flag filters out `abi: "musl"` targets. Use our `--musl` flag instead.
+- **Wrapper must run patchelf via musl linker**: Alpine's patchelf is musl-linked. Invoke it as `ld-musl-x86_64.so.1 --library-path ... patchelf` — this works because argv[0] doesn't matter for patchelf (unlike Bun).
