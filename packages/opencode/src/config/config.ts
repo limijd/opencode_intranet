@@ -160,7 +160,9 @@ export namespace Config {
 
       deps.push(
         iife(async () => {
+          dbg("config.state: needsInstall check dir=" + dir + " INTRANET=" + INTRANET + " env=" + process.env.OPENCODE_INTRANET)
           const shouldInstall = await needsInstall(dir)
+          dbg("config.state: needsInstall result=" + shouldInstall + " dir=" + dir)
           if (shouldInstall) {
             dbg("config.state: installDependencies start " + dir)
             await installDependencies(dir)
@@ -348,6 +350,13 @@ export namespace Config {
   }
 
   export async function needsInstall(dir: string) {
+    // Intranet mode: no network access, skip dependency installation
+    // to avoid bun install hanging on unreachable registry.
+    if (INTRANET) {
+      log.debug("intranet mode, skipping dependency install", { dir })
+      return false
+    }
+
     // Some config dirs may be read-only.
     // Installing deps there will fail; skip installation in that case.
     const writable = await isWritable(dir)
