@@ -1142,6 +1142,8 @@ export namespace Provider {
       delete options["chunkTimeout"]
 
       options["fetch"] = async (input: any, init?: BunFetchRequestInit) => {
+        // Debug: log actual request URL and method
+        dbg(`fetch: ${init?.method ?? "GET"} ${typeof input === "string" ? input : input?.url ?? input}`)
         // Preserve custom fetch if it exists, wrap it with timeout logic
         const fetchFn = customFetch ?? fetch
         const opts = init ?? {}
