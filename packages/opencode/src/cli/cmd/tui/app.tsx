@@ -105,6 +105,22 @@ async function getTerminalBackgroundColor(): Promise<"dark" | "light"> {
 
 import type { EventSource } from "./context/sdk"
 
+function supportsKittyKeyboard(): boolean {
+  // Kitty keyboard protocol is only supported by a few terminals.
+  // Enabling it on unsupported terminals (e.g. Konsole) causes raw CSI
+  // sequences like "66;w=1" to leak into the rendered output.
+  const term = process.env["TERM"] ?? ""
+  const termProgram = process.env["TERM_PROGRAM"] ?? ""
+  const supported = [
+    termProgram === "WezTerm",
+    termProgram === "ghostty",
+    term.startsWith("xterm-kitty") || termProgram === "kitty",
+    termProgram === "foot",
+    termProgram === "rio",
+  ]
+  return supported.some(Boolean)
+}
+
 export function tui(input: {
   url: string
   args: Args
@@ -188,7 +204,7 @@ export function tui(input: {
         targetFps: 60,
         gatherStats: false,
         exitOnCtrlC: false,
-        useKittyKeyboard: {},
+        useKittyKeyboard: supportsKittyKeyboard() ? {} : undefined,
         autoFocus: false,
         openConsoleOnError: false,
         consoleOptions: {
