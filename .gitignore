@@ -30,3 +30,4 @@ logs/
 tsconfig.tsbuildinfo
 output/
 output-debug/
+docker/build.log
