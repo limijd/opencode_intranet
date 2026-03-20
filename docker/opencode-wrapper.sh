@@ -15,6 +15,27 @@ MUSL_DIR="$HOME/.opencode/lib"
 export OPENCODE_INTRANET=1
 export LD_LIBRARY_PATH="${MUSL_DIR}:$DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
+# Ensure UTF-8 locale for box-drawing characters (CentOS 7.6 may default to non-UTF-8)
+case "${LANG:-}" in
+    *.[Uu][Tt][Ff]-8|*.[Uu][Tt][Ff]8) ;; # Already UTF-8
+    *)
+        if locale -a 2>/dev/null | grep -qi '^en_US\.utf-\?8$'; then
+            export LANG="en_US.UTF-8"
+        elif locale -a 2>/dev/null | grep -qi '^C\.utf-\?8$'; then
+            export LANG="C.UTF-8"
+        else
+            export LANG="en_US.UTF-8"
+        fi
+        ;;
+esac
+export LC_ALL="${LANG}"
+
+# Ensure 256-color terminal for proper TUI rendering
+case "${TERM:-}" in
+    *-256color|xterm-kitty) ;; # Already good
+    xterm) export TERM="xterm-256color" ;;
+esac
+
 if [ ! -f "$MARKER" ]; then
     echo "OpenCode: first run setup..." >&2
 

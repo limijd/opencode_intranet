@@ -46,7 +46,7 @@ import { GoogleAuth } from "google-auth-library"
 import { ProviderTransform } from "./transform"
 import { Installation } from "../installation"
 import { ModelID, ProviderID } from "./schema"
-import { INTRANET, dbg } from "../intranet/config"
+import { INTRANET, INTRANET_DEBUG, dbg } from "../intranet/config"
 
 const DEFAULT_CHUNK_TIMEOUT = 300_000
 
@@ -1181,6 +1181,10 @@ export namespace Provider {
           // @ts-ignore see here: https://github.com/oven-sh/bun/issues/16682
           timeout: false,
         })
+
+        // Debug: log response status for non-2xx
+        if (INTRANET_DEBUG && !res.ok)
+          dbg(`fetch response: ${res.status} ${res.statusText} for ${typeof input === "string" ? input : input?.url ?? input}`)
 
         if (!chunkAbortCtl) return res
         return wrapSSE(res, chunkTimeout, chunkAbortCtl)

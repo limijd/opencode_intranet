@@ -107,14 +107,15 @@ import type { EventSource } from "./context/sdk"
 
 function supportsKittyKeyboard(): boolean {
   // Kitty keyboard protocol is only supported by a few terminals.
-  // Enabling it on unsupported terminals (e.g. Konsole) causes raw CSI
-  // sequences like "66;w=1" to leak into the rendered output.
+  // Enabling it on unsupported terminals (e.g. Konsole, CentOS 7.6 xterm)
+  // causes raw CSI sequences like "66;w=1" or "Kitty?" to leak into output.
   const term = process.env["TERM"] ?? ""
   const termProgram = process.env["TERM_PROGRAM"] ?? ""
+  const kittyVar = process.env["KITTY_WINDOW_ID"]
   const supported = [
     termProgram === "WezTerm",
     termProgram === "ghostty",
-    term.startsWith("xterm-kitty") || termProgram === "kitty",
+    term.startsWith("xterm-kitty") || termProgram === "kitty" || kittyVar !== undefined,
     termProgram === "foot",
     termProgram === "rio",
   ]
@@ -204,7 +205,7 @@ export function tui(input: {
         targetFps: 60,
         gatherStats: false,
         exitOnCtrlC: false,
-        useKittyKeyboard: supportsKittyKeyboard() ? {} : undefined,
+        useKittyKeyboard: supportsKittyKeyboard() ? {} : null,
         autoFocus: false,
         openConsoleOnError: false,
         consoleOptions: {
